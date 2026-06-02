@@ -56,12 +56,28 @@
         <select id="category-filter" class="select-filter" aria-label="Filter by category">
           <option value="">All categories</option>
         </select>
+        <button type="button" class="btn-secondary btn-sm" id="open-folder-dialog">New folder</button>
         <span id="gallery-count" class="file-count"></span>
         </div>
       </div>
 
       <main class="main">
         <div class="shell main-inner">
+        <nav class="breadcrumb" id="breadcrumb" aria-label="Location"></nav>
+
+        <div id="folders-section" class="folders-section" hidden>
+          <h2 class="section-label">Folders</h2>
+          <div id="folders-row" class="folders-row"></div>
+        </div>
+
+        <div id="root-drop" class="root-drop" hidden>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M3 7v12a2 2 0 002 2h14M7 7l5-4 5 4M12 3v14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          Drop here to move out of folder
+        </div>
+
+        <h2 id="files-label" class="section-label" hidden>Files</h2>
         <div id="gallery" class="gallery" aria-live="polite"></div>
 
         <div id="gallery-empty" class="empty-state" hidden>
@@ -164,6 +180,27 @@
         <footer class="dialog-footer">
           <button type="button" class="btn-ghost" id="cancel-upload">Cancel</button>
           <button type="submit" class="btn-primary" id="submit-upload">Upload</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog id="folder-dialog" class="dialog">
+      <form id="folder-form" class="dialog-inner">
+        <header class="dialog-header">
+          <h2>New folder</h2>
+          <button type="button" class="icon-btn" id="close-folder" aria-label="Close">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+            </svg>
+          </button>
+        </header>
+        <label class="field folder-field">
+          <span>Folder name</span>
+          <input type="text" id="folder-name" required placeholder="e.g. Social ads Q2" autocomplete="off" />
+        </label>
+        <footer class="dialog-footer">
+          <button type="button" class="btn-ghost" id="cancel-folder">Cancel</button>
+          <button type="submit" class="btn-primary">Create folder</button>
         </footer>
       </form>
     </dialog>

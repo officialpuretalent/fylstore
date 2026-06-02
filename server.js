@@ -8,6 +8,7 @@ const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "data");
 const UPLOADS_DIR = path.join(DATA_DIR, "uploads");
 const METADATA_PATH = path.join(DATA_DIR, "metadata.json");
 const CATEGORIES_PATH = path.join(DATA_DIR, "categories.json");
+const FOLDERS_PATH = path.join(DATA_DIR, "folders.json");
 const PUBLIC_DIR = path.join(__dirname, "public");
 
 function assetVersion() {
@@ -37,7 +38,31 @@ function ensureDirs() {
   if (!fs.existsSync(METADATA_PATH)) {
     fs.writeFileSync(METADATA_PATH, "[]", "utf8");
   }
+  if (!fs.existsSync(FOLDERS_PATH)) {
+    fs.writeFileSync(FOLDERS_PATH, "[]", "utf8");
+  }
   syncCategoriesFromMetadata();
+}
+
+function readFolders() {
+  try {
+    if (!fs.existsSync(FOLDERS_PATH)) return [];
+    const parsed = JSON.parse(fs.readFileSync(FOLDERS_PATH, "utf8"));
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeFolders(folders) {
+  const sorted = [...folders].sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+  );
+  fs.writeFileSync(FOLDERS_PATH, JSON.stringify(sorted, null, 2), "utf8");
+}
+
+function findFolder(folderId) {
+  return readFolders().find((f) => f.id === folderId) || null;
 }
 
 function readCategories() {
@@ -167,13 +192,59 @@ app.get("/api/categories", (_req, res) => {
   res.json(readCategories());
 });
 
+app.get("/api/folders", (_req, res) => {
+  res.json(readFolders());
+});
+
+app.post("/api/folders", (req, res) => {
+  const name = req.body?.name?.trim();
+  if (!name) {
+    return res.status(400).json({ error: "Folder name is required" });
+  }
+  const folders = readFolders();
+  if (folders.some((f) => f.name.toLowerCase() === name.toLowerCase())) {
+    return res.status(400).json({ error: "A folder with this name already exists" });
+  }
+  const folder = {
+    id: `folder-${Date.now()}`,
+    name,
+    createdAt: new Date().toISOString(),
+  };
+  folders.push(folder);
+  writeFolders(folders);
+  res.status(201).json(folder);
+});
+
+app.patch("/api/images/:id", (req, res) => {
+  const imageId = req.params.id;
+  const { folderId } = req.body;
+
+  const entries = readMetadata();
+  const index = entries.findIndex((e) => e.id === imageId);
+  if (index === -1) {
+    return res.status(404).json({ error: "Image not found" });
+  }
+
+  let resolvedFolderId = null;
+  if (folderId !== null && folderId !== undefined && folderId !== "") {
+    if (!findFolder(folderId)) {
+      return res.status(400).json({ error: "Folder not found" });
+    }
+    resolvedFolderId = folderId;
+  }
+
+  entries[index] = { ...entries[index], folderId: resolvedFolderId };
+  writeMetadata(entries);
+  res.json(entries[index]);
+});
+
 app.post("/api/upload", (req, res) => {
   upload.single("file")(req, res, (err) => {
     if (err) {
       return res.status(400).json({ error: err.message });
     }
 
-    const { name, category, assetQuality } = req.body;
+    const { name, category, assetQuality, folderId } = req.body;
     if (!name?.trim()) {
       return res.status(400).json({ error: "Name is required" });
     }
@@ -189,6 +260,14 @@ app.post("/api/upload", (req, res) => {
       return res.status(400).json({ error: "Image file is required" });
     }
 
+    let resolvedFolderId = null;
+    if (folderId && folderId !== "null" && folderId !== "") {
+      if (!findFolder(folderId)) {
+        return res.status(400).json({ error: "Folder not found" });
+      }
+      resolvedFolderId = folderId;
+    }
+
     const finalFilename = buildFilename(name, req.file.originalname);
     const tempPath = path.join(UPLOADS_DIR, req.file.filename);
     const finalPath = path.join(UPLOADS_DIR, finalFilename);
@@ -201,6 +280,7 @@ app.post("/api/upload", (req, res) => {
       name: name.trim(),
       category: category.trim(),
       assetQuality,
+      folderId: resolvedFolderId,
       filename: finalFilename,
       url: `/file/${finalFilename}`,
       uploadedAt: new Date().toISOString(),

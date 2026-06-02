@@ -1,9 +1,12 @@
 let allEntries = [];
 let allCategories = [];
+let allFolders = [];
 let activeFilter = "all";
 let activeCategory = "";
 let searchQuery = "";
+let currentFolderId = null;
 let previewEntry = null;
+let draggingImageId = null;
 
 const form = document.getElementById("upload-form");
 const gallery = document.getElementById("gallery");
@@ -22,6 +25,14 @@ const dropPreview = document.getElementById("drop-preview");
 const dropPlaceholder = document.getElementById("drop-placeholder");
 const previewImg = document.getElementById("preview-img");
 const toastEl = document.getElementById("toast");
+const breadcrumb = document.getElementById("breadcrumb");
+const foldersSection = document.getElementById("folders-section");
+const foldersRow = document.getElementById("folders-row");
+const rootDrop = document.getElementById("root-drop");
+const filesLabel = document.getElementById("files-label");
+const folderDialog = document.getElementById("folder-dialog");
+const folderForm = document.getElementById("folder-form");
+const folderNameInput = document.getElementById("folder-name");
 
 function publicUrl(path) {
   return `${window.location.origin}${path}`;
@@ -110,17 +121,176 @@ function setFile(file) {
   }
 }
 
+function folderIdOf(entry) {
+  return entry.folderId || null;
+}
+
+function countInFolder(folderId) {
+  return allEntries.filter((e) => folderIdOf(e) === folderId).length;
+}
+
 function getFiltered() {
   const q = searchQuery.trim().toLowerCase();
+  const searching = q.length > 0;
   return allEntries.filter((e) => {
+    if (!searching) {
+      const viewFolder = currentFolderId || null;
+      if (folderIdOf(e) !== viewFolder) return false;
+    }
     if (activeFilter !== "all" && e.assetQuality !== activeFilter) return false;
     if (activeCategory && e.category !== activeCategory) return false;
     if (q) {
-      const hay = `${e.name} ${e.category} ${e.filename}`.toLowerCase();
+      const folder = allFolders.find((f) => f.id === folderIdOf(e));
+      const folderName = folder ? folder.name : "";
+      const hay = `${e.name} ${e.category} ${e.filename} ${folderName}`.toLowerCase();
       if (!hay.includes(q)) return false;
     }
     return true;
   });
+}
+
+async function moveImage(imageId, folderId) {
+  const res = await fetch(`/api/images/${encodeURIComponent(imageId)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ folderId }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    toast(body.error || "Could not move file", "error");
+    return false;
+  }
+  const idx = allEntries.findIndex((e) => e.id === imageId);
+  if (idx !== -1) allEntries[idx] = body;
+  return true;
+}
+
+function setCurrentFolder(folderId) {
+  currentFolderId = folderId;
+  renderBreadcrumb();
+  renderGallery();
+}
+
+function renderBreadcrumb() {
+  breadcrumb.innerHTML = "";
+
+  const rootBtn = document.createElement("button");
+  rootBtn.type = "button";
+  rootBtn.className = `breadcrumb-btn${currentFolderId ? "" : " current"}`;
+  rootBtn.textContent = "All files";
+  rootBtn.dataset.dropFolder = "root";
+  rootBtn.addEventListener("click", () => {
+    if (currentFolderId) setCurrentFolder(null);
+  });
+  breadcrumb.appendChild(rootBtn);
+
+  if (!currentFolderId) return;
+
+  const sep = document.createElement("span");
+  sep.className = "breadcrumb-sep";
+  sep.textContent = "/";
+  breadcrumb.appendChild(sep);
+
+  const folder = allFolders.find((f) => f.id === currentFolderId);
+  const current = document.createElement("span");
+  current.className = "breadcrumb-btn current";
+  current.textContent = folder?.name || "Folder";
+  breadcrumb.appendChild(current);
+}
+
+function folderIconSvg() {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("width", "40");
+  svg.setAttribute("height", "40");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("fill", "currentColor");
+  svg.classList.add("folder-icon");
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute(
+    "d",
+    "M10 4H4a2 2 0 00-2 2v12a2 2 0 002 2h16a2 2 0 002-2V8a2 2 0 00-2-2h-8l-2-2z"
+  );
+  svg.appendChild(path);
+  return svg;
+}
+
+function dropFolderIdFromEl(el) {
+  const value = el.dataset.dropFolder;
+  return value === "root" ? null : value;
+}
+
+function clearDropTargets() {
+  document.querySelectorAll(".drop-target").forEach((el) => {
+    el.classList.remove("drop-target");
+  });
+}
+
+function initDragDrop() {
+  const main = document.querySelector(".main-inner");
+
+  main.addEventListener("dragover", (e) => {
+    if (!draggingImageId) return;
+    const target = e.target.closest("[data-drop-folder]");
+    if (!target) return;
+    e.preventDefault();
+    clearDropTargets();
+    target.classList.add("drop-target");
+  });
+
+  main.addEventListener("dragleave", (e) => {
+    const target = e.target.closest("[data-drop-folder]");
+    if (target && !target.contains(e.relatedTarget)) {
+      target.classList.remove("drop-target");
+    }
+  });
+
+  main.addEventListener("drop", async (e) => {
+    const target = e.target.closest("[data-drop-folder]");
+    if (!target) return;
+    e.preventDefault();
+    clearDropTargets();
+    const imageId = e.dataTransfer.getData("text/plain") || draggingImageId;
+    const folderId = dropFolderIdFromEl(target);
+    if (!imageId) return;
+    const entry = allEntries.find((i) => i.id === imageId);
+    if (!entry || folderIdOf(entry) === folderId) return;
+    const ok = await moveImage(imageId, folderId);
+    if (ok) {
+      toast(folderId ? "Moved to folder" : "Moved to All files", "success");
+      renderGallery();
+    }
+    draggingImageId = null;
+    rootDrop.hidden = true;
+  });
+}
+
+function renderFolders() {
+  foldersRow.innerHTML = "";
+  const showFolders = !currentFolderId && !searchQuery.trim();
+  foldersSection.hidden = !showFolders || allFolders.length === 0;
+
+  if (!showFolders) return;
+
+  for (const folder of allFolders) {
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "folder-card";
+    card.appendChild(folderIconSvg());
+
+    const name = document.createElement("p");
+    name.className = "folder-name";
+    name.textContent = folder.name;
+
+    const count = document.createElement("p");
+    count.className = "folder-count";
+    const n = countInFolder(folder.id);
+    count.textContent = `${n} file${n === 1 ? "" : "s"}`;
+
+    card.dataset.dropFolder = folder.id;
+    card.append(name, count);
+    card.addEventListener("click", () => setCurrentFolder(folder.id));
+    foldersRow.appendChild(card);
+  }
 }
 
 function fillSelect(select, cats, { placeholder, includeNew } = {}) {
@@ -186,6 +356,24 @@ function getUploadCategoryValue() {
 function renderCard(entry) {
   const card = document.createElement("article");
   card.className = "card";
+  card.draggable = true;
+
+  card.addEventListener("dragstart", (e) => {
+    draggingImageId = entry.id;
+    card.classList.add("dragging");
+    e.dataTransfer.setData("text/plain", entry.id);
+    e.dataTransfer.effectAllowed = "move";
+    rootDrop.hidden = !folderIdOf(entry);
+  });
+
+  card.addEventListener("dragend", () => {
+    card.classList.remove("dragging");
+    draggingImageId = null;
+    rootDrop.hidden = true;
+    document.querySelectorAll(".drop-target").forEach((el) => {
+      el.classList.remove("drop-target");
+    });
+  });
 
   const media = document.createElement("div");
   media.className = "card-media";
@@ -244,10 +432,25 @@ function renderCard(entry) {
   date.className = "card-date";
   date.textContent = formatDate(entry.uploadedAt);
 
-  body.append(title, row, date);
+  body.append(title);
+
+  if (searchQuery.trim() && folderIdOf(entry)) {
+    const folder = allFolders.find((f) => f.id === folderIdOf(entry));
+    if (folder) {
+      const tag = document.createElement("p");
+      tag.className = "card-folder-tag";
+      tag.textContent = folder.name;
+      body.append(tag);
+    }
+  }
+
+  body.append(row, date);
   card.append(media, body);
 
-  card.addEventListener("click", () => openPreview(entry));
+  card.addEventListener("click", (ev) => {
+    if (card.classList.contains("dragging")) return;
+    openPreview(entry);
+  });
   return card;
 }
 
@@ -263,13 +466,24 @@ function openPreview(entry) {
 }
 
 function renderGallery() {
+  renderBreadcrumb();
+  renderFolders();
+
   const filtered = getFiltered();
+  const imagesOnly = filtered;
   gallery.innerHTML = "";
 
-  const total = allEntries.length;
-  const shown = filtered.length;
+  const inView = allEntries.filter((e) => {
+    if (searchQuery.trim()) return true;
+    return folderIdOf(e) === (currentFolderId || null);
+  });
+  const total = inView.length;
+  const shown = imagesOnly.length;
 
-  if (total === 0) {
+  const hasFolders = !currentFolderId && !searchQuery.trim() && allFolders.length > 0;
+  filesLabel.hidden = !hasFolders && shown === 0;
+
+  if (allEntries.length === 0 && allFolders.length === 0) {
     galleryCount.textContent = "";
     galleryEmpty.hidden = false;
     return;
@@ -277,19 +491,24 @@ function renderGallery() {
 
   galleryEmpty.hidden = true;
 
-  if (shown === total) {
+  if (searchQuery.trim()) {
+    galleryCount.textContent = `${shown} result${shown === 1 ? "" : "s"}`;
+  } else if (shown === total) {
     galleryCount.textContent = `${total} file${total === 1 ? "" : "s"}`;
   } else {
     galleryCount.textContent = `${shown} of ${total} files`;
   }
 
   if (shown === 0) {
-    gallery.innerHTML =
-      '<p class="empty-filter">No files match your filters.</p>';
+    const msg =
+      total === 0 && currentFolderId
+        ? "This folder is empty. Drag files here or upload new ones."
+        : "No files match your filters.";
+    gallery.innerHTML = `<p class="empty-filter">${msg}</p>`;
     return;
   }
 
-  for (const entry of filtered) {
+  for (const entry of imagesOnly) {
     gallery.appendChild(renderCard(entry));
   }
 }
@@ -299,12 +518,18 @@ async function loadCategories() {
   allCategories = await res.json();
 }
 
+async function loadFolders() {
+  const res = await fetch("/api/folders");
+  allFolders = await res.json();
+}
+
 async function loadGallery() {
   await Promise.all([
     fetch("/api/images").then((r) => r.json()).then((data) => {
       allEntries = data;
     }),
     loadCategories(),
+    loadFolders(),
   ]);
   updateCategoryOptions();
   renderGallery();
@@ -409,6 +634,9 @@ form.addEventListener("submit", async (e) => {
   data.append("category", category);
   data.append("assetQuality", form.assetQuality.value);
   data.append("file", fileInput.files[0]);
+  if (currentFolderId) {
+    data.append("folderId", currentFolderId);
+  }
 
   try {
     const res = await fetch("/api/upload", { method: "POST", body: data });
@@ -431,5 +659,45 @@ form.addEventListener("submit", async (e) => {
     btn.disabled = false;
   }
 });
+
+document.getElementById("open-folder-dialog").addEventListener("click", () => {
+  folderNameInput.value = "";
+  folderDialog.showModal();
+});
+
+document.getElementById("close-folder").addEventListener("click", () => folderDialog.close());
+document.getElementById("cancel-folder").addEventListener("click", () => folderDialog.close());
+folderDialog.addEventListener("click", (e) => {
+  if (e.target === folderDialog) folderDialog.close();
+});
+
+folderForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const name = folderNameInput.value.trim();
+  if (!name) return;
+
+  try {
+    const res = await fetch("/api/folders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast(body.error || "Could not create folder", "error");
+      return;
+    }
+    allFolders.push(body);
+    allFolders.sort((a, b) => a.name.localeCompare(b.name));
+    folderDialog.close();
+    toast("Folder created", "success");
+    renderGallery();
+  } catch {
+    toast("Network error — try again", "error");
+  }
+});
+
+rootDrop.dataset.dropFolder = "root";
+initDragDrop();
 
 loadGallery();
