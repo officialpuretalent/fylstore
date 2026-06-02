@@ -611,11 +611,29 @@ function openPreview(entry) {
   previewEntry = entry;
   document.getElementById("preview-full").src = entry.url;
   document.getElementById("preview-title").textContent = entry.name;
-  document.getElementById("preview-details").textContent = `${entry.category} · ${
-    entry.assetQuality === "good" ? "Expected to pass QC" : "Expected to fail QC"
-  } · ${formatDate(entry.uploadedAt)}`;
+
+  const folder = allFolders.find((f) => f.id === folderIdOf(entry));
+  const qc =
+    entry.assetQuality === "good" ? "Expected to pass QC" : "Expected to fail QC";
+  const parts = [entry.category, qc, formatDate(entry.uploadedAt)];
+  if (folder) parts.unshift(folder.name);
+  document.getElementById("preview-details").textContent = parts.join(" · ");
+
   document.getElementById("preview-open").href = entry.url;
+  document.getElementById("preview-move-out").hidden = !folderIdOf(entry);
   previewDialog.showModal();
+}
+
+async function moveOutOfFolder() {
+  if (!previewEntry || !folderIdOf(previewEntry)) return;
+
+  const ok = await moveImage(previewEntry.id, null);
+  if (!ok) return;
+
+  previewEntry = allEntries.find((e) => e.id === previewEntry.id) || previewEntry;
+  toast("Moved to All files", "success");
+  openPreview(previewEntry);
+  renderGallery();
 }
 
 function renderGallery() {
