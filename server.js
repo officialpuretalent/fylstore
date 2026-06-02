@@ -9,6 +9,28 @@ const UPLOADS_DIR = path.join(DATA_DIR, "uploads");
 const METADATA_PATH = path.join(DATA_DIR, "metadata.json");
 const PUBLIC_DIR = path.join(__dirname, "public");
 
+function assetVersion() {
+  const files = ["styles.css", "app.js", "index.html"];
+  let latest = 0;
+  for (const file of files) {
+    const filePath = path.join(PUBLIC_DIR, file);
+    if (fs.existsSync(filePath)) {
+      latest = Math.max(latest, fs.statSync(filePath).mtimeMs);
+    }
+  }
+  return String(Math.floor(latest));
+}
+
+function serveIndex(_req, res) {
+  let html = fs.readFileSync(path.join(PUBLIC_DIR, "index.html"), "utf8");
+  const v = assetVersion();
+  html = html
+    .replace('href="/styles.css"', `href="/styles.css?v=${v}"`)
+    .replace('src="/app.js"', `src="/app.js?v=${v}"`);
+  res.set("Cache-Control", "no-cache");
+  res.type("html").send(html);
+}
+
 function ensureDirs() {
   fs.mkdirSync(UPLOADS_DIR, { recursive: true });
   if (!fs.existsSync(METADATA_PATH)) {
@@ -72,7 +94,7 @@ const upload = multer({
 
 const app = express();
 app.use(express.json());
-app.use(express.static(PUBLIC_DIR));
+app.use(express.static(PUBLIC_DIR, { index: false }));
 
 app.get("/api/images", (_req, res) => {
   const entries = readMetadata().sort(
@@ -130,8 +152,16 @@ app.get("/file/:filename", (req, res) => {
   res.sendFile(filePath);
 });
 
-app.get("*", (_req, res) => {
-  res.sendFile(path.join(PUBLIC_DIR, "index.html"));
+app.get("/", serveIndex);
+
+app.get("*", (req, res) => {
+  if (req.path.startsWith("/api") || req.path.startsWith("/file")) {
+    return res.status(404).send("Not found");
+  }
+  if (path.extname(req.path)) {
+    return res.status(404).send("Not found");
+  }
+  serveIndex(req, res);
 });
 
 app.listen(PORT, () => {

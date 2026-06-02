@@ -6,7 +6,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "DATA_DIR=./data PORT=3456 node --watch server.js"
   },
   "engines": {
     "node": ">=20"
