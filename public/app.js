@@ -230,8 +230,8 @@ function renderBreadcrumb() {
 
 function folderIconSvg() {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("width", "40");
-  svg.setAttribute("height", "40");
+  svg.setAttribute("width", "52");
+  svg.setAttribute("height", "52");
   svg.setAttribute("viewBox", "0 0 24 24");
   svg.setAttribute("fill", "currentColor");
   svg.classList.add("folder-icon");
