@@ -3,23 +3,123 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Fylstore — Image Catalog</title>
+    <title>Fylstore</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <header class="header">
-      <div>
-        <h1>Fylstore</h1>
-        <p class="subtitle">Marketing image catalog for QC testing</p>
-      </div>
-    </header>
+    <div class="app">
+      <header class="topbar">
+        <div class="topbar-brand">
+          <span class="logo" aria-hidden="true">
+            <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+              <rect width="28" height="28" rx="8" fill="currentColor" />
+              <path
+                d="M8 18V10l6 4 6-4v8"
+                stroke="#fff"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </span>
+          <div>
+            <h1>Fylstore</h1>
+            <p class="tagline">Marketing asset library</p>
+          </div>
+        </div>
 
-    <main class="layout">
-      <section class="panel upload-panel">
-        <h2>Upload image</h2>
-        <form id="upload-form" class="upload-form">
-          <label>
-            Name
+        <div class="search-wrap">
+          <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2" />
+            <path d="M20 20l-3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          </svg>
+          <input
+            type="search"
+            id="search"
+            placeholder="Search by name or category…"
+            autocomplete="off"
+          />
+        </div>
+
+        <button type="button" class="btn-upload" id="open-upload">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          </svg>
+          New upload
+        </button>
+      </header>
+
+      <div class="toolbar">
+        <div class="filters" role="group" aria-label="Filter by QC status">
+          <button type="button" class="chip active" data-filter="all">All</button>
+          <button type="button" class="chip" data-filter="good">Pass QC</button>
+          <button type="button" class="chip" data-filter="bad">Fail QC</button>
+        </div>
+        <select id="category-filter" class="select-filter" aria-label="Filter by category">
+          <option value="">All categories</option>
+        </select>
+        <span id="gallery-count" class="file-count"></span>
+      </div>
+
+      <main class="main">
+        <div id="gallery" class="gallery" aria-live="polite"></div>
+
+        <div id="gallery-empty" class="empty-state" hidden>
+          <div class="empty-icon" aria-hidden="true">
+            <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+              <rect x="8" y="14" width="48" height="36" rx="6" stroke="currentColor" stroke-width="2" />
+              <circle cx="24" cy="28" r="4" fill="currentColor" opacity="0.4" />
+              <path d="M8 42l14-12 10 8 12-14 12 14" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
+            </svg>
+          </div>
+          <h2>No assets yet</h2>
+          <p>Upload marketing images to catalog them for QC review.</p>
+          <button type="button" class="btn-secondary" id="empty-upload">Upload your first image</button>
+        </div>
+      </main>
+    </div>
+
+    <dialog id="upload-dialog" class="dialog">
+      <form id="upload-form" method="dialog" class="dialog-inner">
+        <header class="dialog-header">
+          <h2>Upload image</h2>
+          <button type="button" class="icon-btn" id="close-upload" aria-label="Close">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+            </svg>
+          </button>
+        </header>
+
+        <div id="drop-zone" class="drop-zone">
+          <input type="file" name="file" id="file-input" accept="image/*" required hidden />
+          <div class="drop-preview" id="drop-preview" hidden>
+            <img id="preview-img" alt="" />
+            <button type="button" class="text-btn" id="change-file">Change file</button>
+          </div>
+          <div class="drop-placeholder" id="drop-placeholder">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path
+                d="M12 16V8m0 0l-3 3m3-3l3 3M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            <p><strong>Drop an image</strong> or <span class="linkish">browse</span></p>
+            <p class="drop-hint">PNG, JPG, WebP · max 15 MB</p>
+          </div>
+        </div>
+
+        <div class="form-grid">
+          <label class="field">
+            <span>Name</span>
             <input
               type="text"
               name="name"
@@ -28,47 +128,67 @@
               autocomplete="off"
             />
           </label>
-          <label>
-            Category
+          <label class="field">
+            <span>Category</span>
             <input
               type="text"
               name="category"
               required
-              placeholder="social, email, landing..."
+              placeholder="social, email, landing…"
+              list="category-suggestions"
               autocomplete="off"
             />
+            <datalist id="category-suggestions"></datalist>
           </label>
-          <fieldset class="quality-field">
-            <legend>Asset quality</legend>
-            <label class="radio">
-              <input type="radio" name="assetQuality" value="good" required />
-              Good — passes QC
-            </label>
-            <label class="radio">
-              <input type="radio" name="assetQuality" value="bad" />
-              Bad — should fail QC
-            </label>
-          </fieldset>
-          <label class="file-label">
-            Image file
-            <input type="file" name="file" accept="image/*" required />
-          </label>
-          <button type="submit" class="btn-primary">Upload</button>
-          <p id="form-message" class="form-message" hidden></p>
-        </form>
-      </section>
-
-      <section class="panel gallery-panel">
-        <div class="gallery-header">
-          <h2>Catalog</h2>
-          <span id="gallery-count" class="count"></span>
         </div>
-        <div id="gallery" class="gallery" aria-live="polite"></div>
-        <p id="gallery-empty" class="empty" hidden>
-          No images yet. Upload one to get started.
-        </p>
-      </section>
-    </main>
+
+        <fieldset class="qc-field">
+          <legend>QC expectation</legend>
+          <div class="segmented">
+            <label class="segment">
+              <input type="radio" name="assetQuality" value="good" required />
+              <span class="segment-label">
+                <span class="dot good"></span>
+                Pass QC
+              </span>
+            </label>
+            <label class="segment">
+              <input type="radio" name="assetQuality" value="bad" />
+              <span class="segment-label">
+                <span class="dot bad"></span>
+                Fail QC
+              </span>
+            </label>
+          </div>
+        </fieldset>
+
+        <footer class="dialog-footer">
+          <button type="button" class="btn-ghost" id="cancel-upload">Cancel</button>
+          <button type="submit" class="btn-primary" id="submit-upload">Upload</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog id="preview-dialog" class="dialog preview-dialog">
+      <div class="preview-inner">
+        <button type="button" class="icon-btn preview-close" id="close-preview" aria-label="Close">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          </svg>
+        </button>
+        <img id="preview-full" alt="" />
+        <div class="preview-meta">
+          <h3 id="preview-title"></h3>
+          <p id="preview-details"></p>
+          <div class="preview-actions">
+            <button type="button" class="btn-secondary" id="preview-copy">Copy URL</button>
+            <a id="preview-open" class="btn-primary" href="#" target="_blank" rel="noopener">Open file</a>
+          </div>
+        </div>
+      </div>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
     <script src="/app.js"></script>
   </body>
