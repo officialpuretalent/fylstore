@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fylstore — Image Catalog</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="header">
+      <div>
+        <h1>Fylstore</h1>
+        <p class="subtitle">Marketing image catalog for QC testing</p>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="panel upload-panel">
+        <h2>Upload image</h2>
+        <form id="upload-form" class="upload-form">
+          <label>
+            Name
+            <input
+              type="text"
+              name="name"
+              required
+              placeholder="hero-banner-spring"
+              autocomplete="off"
+            />
+          </label>
+          <label>
+            Category
+            <input
+              type="text"
+              name="category"
+              required
+              placeholder="social, email, landing..."
+              autocomplete="off"
+            />
+          </label>
+          <fieldset class="quality-field">
+            <legend>Asset quality</legend>
+            <label class="radio">
+              <input type="radio" name="assetQuality" value="good" required />
+              Good — passes QC
+            </label>
+            <label class="radio">
+              <input type="radio" name="assetQuality" value="bad" />
+              Bad — should fail QC
+            </label>
+          </fieldset>
+          <label class="file-label">
+            Image file
+            <input type="file" name="file" accept="image/*" required />
+          </label>
+          <button type="submit" class="btn-primary">Upload</button>
+          <p id="form-message" class="form-message" hidden></p>
+        </form>
+      </section>
+
+      <section class="panel gallery-panel">
+        <div class="gallery-header">
+          <h2>Catalog</h2>
+          <span id="gallery-count" class="count"></span>
+        </div>
+        <div id="gallery" class="gallery" aria-live="polite"></div>
+        <p id="gallery-empty" class="empty" hidden>
+          No images yet. Upload one to get started.
+        </p>
+      </section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
