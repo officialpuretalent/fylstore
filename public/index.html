@@ -92,7 +92,6 @@
         </header>
 
         <div id="drop-zone" class="drop-zone">
-          <input type="file" name="file" id="file-input" accept="image/*" required hidden />
           <div class="drop-preview" id="drop-preview" hidden>
             <img id="preview-img" alt="" />
             <button type="button" class="text-btn" id="change-file">Change file</button>
@@ -125,15 +124,18 @@
           </label>
           <label class="field">
             <span>Category</span>
+            <select id="upload-category" required>
+              <option value="" disabled selected>Select category</option>
+            </select>
+          </label>
+          <label class="field" id="category-new-field" hidden>
+            <span>New category</span>
             <input
               type="text"
-              name="category"
-              required
+              id="category-new-input"
               placeholder="social, email, landing…"
-              list="category-suggestions"
               autocomplete="off"
             />
-            <datalist id="category-suggestions"></datalist>
           </label>
         </div>
 
@@ -156,6 +158,8 @@
             </label>
           </div>
         </fieldset>
+
+        <input type="file" name="file" id="file-input" accept="image/*" required hidden />
 
         <footer class="dialog-footer">
           <button type="button" class="btn-ghost" id="cancel-upload">Cancel</button>

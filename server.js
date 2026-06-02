@@ -7,6 +7,7 @@ const PORT = Number(process.env.PORT) || 3000;
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "data");
 const UPLOADS_DIR = path.join(DATA_DIR, "uploads");
 const METADATA_PATH = path.join(DATA_DIR, "metadata.json");
+const CATEGORIES_PATH = path.join(DATA_DIR, "categories.json");
 const PUBLIC_DIR = path.join(__dirname, "public");
 
 function assetVersion() {
@@ -36,6 +37,56 @@ function ensureDirs() {
   if (!fs.existsSync(METADATA_PATH)) {
     fs.writeFileSync(METADATA_PATH, "[]", "utf8");
   }
+  syncCategoriesFromMetadata();
+}
+
+function readCategories() {
+  try {
+    if (!fs.existsSync(CATEGORIES_PATH)) {
+      return [];
+    }
+    const parsed = JSON.parse(fs.readFileSync(CATEGORIES_PATH, "utf8"));
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeCategories(categories) {
+  const sorted = [...categories].sort((a, b) =>
+    a.localeCompare(b, undefined, { sensitivity: "base" })
+  );
+  fs.writeFileSync(CATEGORIES_PATH, JSON.stringify(sorted, null, 2), "utf8");
+}
+
+function syncCategoriesFromMetadata() {
+  const fromImages = readMetadata()
+    .map((e) => e.category?.trim())
+    .filter(Boolean);
+  const existing = readCategories();
+  const merged = [...existing];
+  for (const cat of fromImages) {
+    if (!merged.some((c) => c.toLowerCase() === cat.toLowerCase())) {
+      merged.push(cat);
+    }
+  }
+  if (merged.length > 0) {
+    writeCategories(merged);
+  } else if (!fs.existsSync(CATEGORIES_PATH)) {
+    writeCategories([]);
+  }
+}
+
+function addCategory(category) {
+  const value = String(category).trim();
+  if (!value) return readCategories();
+  const categories = readCategories();
+  if (categories.some((c) => c.toLowerCase() === value.toLowerCase())) {
+    return categories;
+  }
+  categories.push(value);
+  writeCategories(categories);
+  return categories;
 }
 
 function readMetadata() {
@@ -70,16 +121,25 @@ function uniqueFilename(desired, ext) {
   return candidate;
 }
 
+const ALLOWED_EXT = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"];
+
+function safeExtension(originalName) {
+  const ext = path.extname(originalName).toLowerCase() || ".png";
+  return ALLOWED_EXT.includes(ext) ? ext : ".png";
+}
+
+function buildFilename(displayName, originalName) {
+  const base = sanitizeFilename(displayName);
+  return uniqueFilename(base, safeExtension(originalName));
+}
+
 ensureDirs();
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase() || ".png";
-    const allowed = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"];
-    const safeExt = allowed.includes(ext) ? ext : ".png";
-    const base = sanitizeFilename(req.body.name || "image");
-    cb(null, uniqueFilename(base, safeExt));
+  filename: (_req, file, cb) => {
+    const ext = safeExtension(file.originalname);
+    cb(null, `upload-${Date.now()}${ext}`);
   },
 });
 
@@ -101,6 +161,10 @@ app.get("/api/images", (_req, res) => {
     (a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt)
   );
   res.json(entries);
+});
+
+app.get("/api/categories", (_req, res) => {
+  res.json(readCategories());
 });
 
 app.post("/api/upload", (req, res) => {
@@ -125,21 +189,29 @@ app.post("/api/upload", (req, res) => {
       return res.status(400).json({ error: "Image file is required" });
     }
 
+    const finalFilename = buildFilename(name, req.file.originalname);
+    const tempPath = path.join(UPLOADS_DIR, req.file.filename);
+    const finalPath = path.join(UPLOADS_DIR, finalFilename);
+    if (req.file.filename !== finalFilename) {
+      fs.renameSync(tempPath, finalPath);
+    }
+
     const entry = {
-      id: `${Date.now()}-${req.file.filename}`,
+      id: `${Date.now()}-${finalFilename}`,
       name: name.trim(),
       category: category.trim(),
       assetQuality,
-      filename: req.file.filename,
-      url: `/file/${req.file.filename}`,
+      filename: finalFilename,
+      url: `/file/${finalFilename}`,
       uploadedAt: new Date().toISOString(),
     };
 
     const entries = readMetadata();
     entries.push(entry);
     writeMetadata(entries);
+    const categories = addCategory(category);
 
-    res.status(201).json(entry);
+    res.status(201).json({ ...entry, categories });
   });
 });
 

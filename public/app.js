@@ -1,4 +1,5 @@
 let allEntries = [];
+let allCategories = [];
 let activeFilter = "all";
 let activeCategory = "";
 let searchQuery = "";
@@ -10,7 +11,9 @@ const galleryEmpty = document.getElementById("gallery-empty");
 const galleryCount = document.getElementById("gallery-count");
 const searchInput = document.getElementById("search");
 const categoryFilter = document.getElementById("category-filter");
-const categorySuggestions = document.getElementById("category-suggestions");
+const uploadCategory = document.getElementById("upload-category");
+const categoryNewField = document.getElementById("category-new-field");
+const categoryNewInput = document.getElementById("category-new-input");
 const uploadDialog = document.getElementById("upload-dialog");
 const previewDialog = document.getElementById("preview-dialog");
 const dropZone = document.getElementById("drop-zone");
@@ -70,7 +73,12 @@ function openUpload() {
 function closeUpload() {
   uploadDialog.close();
   resetDropZone();
+  resetCategoryNewField();
   form.reset();
+  fillSelect(uploadCategory, allCategories, {
+    placeholder: "Select category",
+    includeNew: true,
+  });
 }
 
 function resetDropZone() {
@@ -115,18 +123,64 @@ function getFiltered() {
   });
 }
 
-function updateCategoryOptions() {
-  const cats = [...new Set(allEntries.map((e) => e.category))].sort();
-  const current = categoryFilter.value;
-  categoryFilter.innerHTML = '<option value="">All categories</option>';
-  categorySuggestions.innerHTML = "";
+function fillSelect(select, cats, { placeholder, includeNew } = {}) {
+  const current = select.value;
+  select.innerHTML = "";
+  if (placeholder) {
+    const ph = document.createElement("option");
+    ph.value = "";
+    ph.disabled = true;
+    ph.selected = !current;
+    ph.textContent = placeholder;
+    select.appendChild(ph);
+  }
   for (const cat of cats) {
     const opt = document.createElement("option");
     opt.value = cat;
-    categoryFilter.appendChild(opt.cloneNode(true));
-    categorySuggestions.appendChild(opt);
+    opt.textContent = cat;
+    select.appendChild(opt);
   }
-  if (cats.includes(current)) categoryFilter.value = current;
+  if (includeNew) {
+    const neu = document.createElement("option");
+    neu.value = "__new__";
+    neu.textContent = "+ New category";
+    select.appendChild(neu);
+  }
+  if (current && [...select.options].some((o) => o.value === current)) {
+    select.value = current;
+  }
+}
+
+function updateCategoryOptions() {
+  const filterValue = categoryFilter.value;
+  categoryFilter.innerHTML = '<option value="">All categories</option>';
+  for (const cat of allCategories) {
+    const opt = document.createElement("option");
+    opt.value = cat;
+    opt.textContent = cat;
+    categoryFilter.appendChild(opt);
+  }
+  if (allCategories.includes(filterValue)) {
+    categoryFilter.value = filterValue;
+  }
+
+  fillSelect(uploadCategory, allCategories, {
+    placeholder: "Select category",
+    includeNew: true,
+  });
+}
+
+function resetCategoryNewField() {
+  categoryNewField.hidden = true;
+  categoryNewInput.value = "";
+  categoryNewInput.required = false;
+}
+
+function getUploadCategoryValue() {
+  if (uploadCategory.value === "__new__") {
+    return categoryNewInput.value.trim();
+  }
+  return uploadCategory.value;
 }
 
 function renderCard(entry) {
@@ -240,9 +294,18 @@ function renderGallery() {
   }
 }
 
+async function loadCategories() {
+  const res = await fetch("/api/categories");
+  allCategories = await res.json();
+}
+
 async function loadGallery() {
-  const res = await fetch("/api/images");
-  allEntries = await res.json();
+  await Promise.all([
+    fetch("/api/images").then((r) => r.json()).then((data) => {
+      allEntries = data;
+    }),
+    loadCategories(),
+  ]);
   updateCategoryOptions();
   renderGallery();
 }
@@ -301,6 +364,24 @@ categoryFilter.addEventListener("change", () => {
   renderGallery();
 });
 
+uploadCategory.addEventListener("change", () => {
+  if (uploadCategory.value === "__new__") {
+    categoryNewField.hidden = false;
+    categoryNewInput.required = true;
+    categoryNewInput.focus();
+    return;
+  }
+  resetCategoryNewField();
+});
+
+categoryNewInput.addEventListener("input", () => {
+  if (categoryNewInput.value.trim()) {
+    uploadCategory.removeAttribute("required");
+  } else {
+    uploadCategory.setAttribute("required", "required");
+  }
+});
+
 searchInput.addEventListener("input", () => {
   searchQuery = searchInput.value;
   renderGallery();
@@ -317,7 +398,17 @@ form.addEventListener("submit", async (e) => {
   const btn = document.getElementById("submit-upload");
   btn.disabled = true;
 
-  const data = new FormData(form);
+  const category = getUploadCategoryValue();
+  if (!category) {
+    toast("Choose or enter a category", "error");
+    return;
+  }
+
+  const data = new FormData();
+  data.append("name", form.name.value.trim());
+  data.append("category", category);
+  data.append("assetQuality", form.assetQuality.value);
+  data.append("file", fileInput.files[0]);
 
   try {
     const res = await fetch("/api/upload", { method: "POST", body: data });
@@ -328,6 +419,9 @@ form.addEventListener("submit", async (e) => {
       return;
     }
 
+    if (body.categories) {
+      allCategories = body.categories;
+    }
     toast("Upload complete", "success");
     closeUpload();
     await loadGallery();
