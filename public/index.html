@@ -53,7 +53,7 @@
           <button type="button" class="chip" data-filter="good">Pass QC</button>
           <button type="button" class="chip" data-filter="bad">Fail QC</button>
         </div>
-        <select id="category-filter" class="select-filter" aria-label="Filter by category">
+        <select id="category-filter" class="select-control select-filter" aria-label="Filter by category">
           <option value="">All categories</option>
         </select>
         <button type="button" class="btn-secondary btn-sm" id="open-folder-dialog">New folder</button>
@@ -133,7 +133,7 @@
           </label>
           <label class="field">
             <span>Category</span>
-            <select id="upload-category" required>
+            <select id="upload-category" class="select-control" required>
               <option value="" disabled selected>Select category</option>
             </select>
           </label>
@@ -194,11 +194,11 @@
           </label>
           <label class="field">
             <span>Category</span>
-            <select id="edit-category" required></select>
+            <select id="edit-category" class="select-control" required></select>
           </label>
           <label class="field">
             <span>Folder</span>
-            <select id="edit-folder">
+            <select id="edit-folder" class="select-control">
               <option value="">All files (no folder)</option>
             </select>
           </label>
