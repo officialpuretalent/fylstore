@@ -184,10 +184,62 @@
       </form>
     </dialog>
 
+    <dialog id="edit-dialog" class="dialog">
+      <form id="edit-form" class="dialog-inner">
+        <header class="dialog-header">
+          <h2>Edit image</h2>
+          <button type="button" class="icon-btn" id="close-edit" aria-label="Close">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+            </svg>
+          </button>
+        </header>
+        <div class="form-grid edit-form-grid">
+          <label class="field">
+            <span>Name</span>
+            <input type="text" id="edit-name" required autocomplete="off" />
+          </label>
+          <label class="field">
+            <span>Category</span>
+            <select id="edit-category" required></select>
+          </label>
+          <label class="field">
+            <span>Folder</span>
+            <select id="edit-folder">
+              <option value="">All files (no folder)</option>
+            </select>
+          </label>
+        </div>
+        <fieldset class="qc-field">
+          <legend>QC expectation</legend>
+          <div class="segmented">
+            <label class="segment">
+              <input type="radio" name="editAssetQuality" value="good" required />
+              <span class="segment-label">
+                <span class="dot good"></span>
+                Pass QC
+              </span>
+            </label>
+            <label class="segment">
+              <input type="radio" name="editAssetQuality" value="bad" />
+              <span class="segment-label">
+                <span class="dot bad"></span>
+                Fail QC
+              </span>
+            </label>
+          </div>
+        </fieldset>
+        <footer class="dialog-footer">
+          <button type="button" class="btn-ghost" id="cancel-edit">Cancel</button>
+          <button type="submit" class="btn-primary">Save changes</button>
+        </footer>
+      </form>
+    </dialog>
+
     <dialog id="folder-dialog" class="dialog">
       <form id="folder-form" class="dialog-inner">
         <header class="dialog-header">
-          <h2>New folder</h2>
+          <h2 id="folder-dialog-title">New folder</h2>
           <button type="button" class="icon-btn" id="close-folder" aria-label="Close">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
               <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
@@ -200,7 +252,7 @@
         </label>
         <footer class="dialog-footer">
           <button type="button" class="btn-ghost" id="cancel-folder">Cancel</button>
-          <button type="submit" class="btn-primary">Create folder</button>
+          <button type="submit" class="btn-primary" id="folder-submit-btn">Create folder</button>
         </footer>
       </form>
     </dialog>
@@ -219,6 +271,8 @@
           <div class="preview-actions">
             <button type="button" class="btn-secondary" id="preview-copy">Copy URL</button>
             <a id="preview-open" class="btn-primary" href="#" target="_blank" rel="noopener">Open file</a>
+            <button type="button" class="btn-secondary" id="preview-edit">Edit</button>
+            <button type="button" class="btn-danger" id="preview-delete">Delete</button>
           </div>
         </div>
       </div>

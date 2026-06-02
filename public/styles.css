@@ -282,6 +282,16 @@ select {
   color: var(--text-tertiary);
 }
 
+.breadcrumb-action {
+  margin-left: 0.25rem;
+}
+
+.breadcrumb .btn-danger.btn-sm {
+  width: auto;
+  padding: 0.3rem 0.65rem;
+  font-size: 0.75rem;
+}
+
 .section-label {
   margin: 0 0 0.75rem;
   font-size: 0.75rem;
@@ -971,6 +981,72 @@ select {
 
 .preview-actions .btn-primary {
   justify-content: center;
+}
+
+.btn-danger {
+  padding: 0.55rem 1.25rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: var(--bad-bg);
+  color: var(--bad);
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  width: 100%;
+}
+
+.btn-danger:hover {
+  background: var(--bad);
+  color: #fff;
+}
+
+.edit-form-grid {
+  padding-top: 0.25rem;
+}
+
+.folder-card-wrap {
+  position: relative;
+}
+
+.folder-card-wrap .folder-card {
+  width: 100%;
+}
+
+.folder-card .folder-actions {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  display: none;
+  gap: 0.2rem;
+}
+
+.folder-card-wrap:hover .folder-actions,
+.folder-card-wrap:focus-within .folder-actions {
+  display: flex;
+}
+
+.icon-btn-sm {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-sm);
+}
+
+.icon-btn-sm:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.icon-btn-sm.danger:hover {
+  background: var(--bad-bg);
+  color: var(--bad);
 }
 
 /* —— Toast —— */

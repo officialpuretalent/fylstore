@@ -136,14 +136,29 @@ function sanitizeFilename(name) {
   return base || "image";
 }
 
-function uniqueFilename(desired, ext) {
+function uniqueFilename(desired, ext, exceptFilename = null) {
   let candidate = `${desired}${ext}`;
   let n = 1;
-  while (fs.existsSync(path.join(UPLOADS_DIR, candidate))) {
+  while (
+    fs.existsSync(path.join(UPLOADS_DIR, candidate)) &&
+    candidate !== exceptFilename
+  ) {
     candidate = `${desired}-${n}${ext}`;
     n += 1;
   }
   return candidate;
+}
+
+function renameImageFile(entry, newDisplayName) {
+  const ext = safeExtension(entry.filename);
+  const base = sanitizeFilename(newDisplayName);
+  const newFilename = uniqueFilename(base, ext, entry.filename);
+  if (entry.filename !== newFilename) {
+    const oldPath = path.join(UPLOADS_DIR, entry.filename);
+    const newPath = path.join(UPLOADS_DIR, newFilename);
+    fs.renameSync(oldPath, newPath);
+  }
+  return newFilename;
 }
 
 const ALLOWED_EXT = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"];
@@ -217,7 +232,7 @@ app.post("/api/folders", (req, res) => {
 
 app.patch("/api/images/:id", (req, res) => {
   const imageId = req.params.id;
-  const { folderId } = req.body;
+  const { folderId, name, category, assetQuality } = req.body;
 
   const entries = readMetadata();
   const index = entries.findIndex((e) => e.id === imageId);
@@ -225,17 +240,113 @@ app.patch("/api/images/:id", (req, res) => {
     return res.status(404).json({ error: "Image not found" });
   }
 
-  let resolvedFolderId = null;
-  if (folderId !== null && folderId !== undefined && folderId !== "") {
-    if (!findFolder(folderId)) {
-      return res.status(400).json({ error: "Folder not found" });
+  const current = entries[index];
+  const updated = { ...current };
+
+  if (name !== undefined) {
+    const trimmed = String(name).trim();
+    if (!trimmed) {
+      return res.status(400).json({ error: "Name is required" });
     }
-    resolvedFolderId = folderId;
+    updated.name = trimmed;
+    const newFilename = renameImageFile(current, trimmed);
+    updated.filename = newFilename;
+    updated.url = `/file/${newFilename}`;
   }
 
-  entries[index] = { ...entries[index], folderId: resolvedFolderId };
+  if (category !== undefined) {
+    const trimmed = String(category).trim();
+    if (!trimmed) {
+      return res.status(400).json({ error: "Category is required" });
+    }
+    updated.category = trimmed;
+    addCategory(trimmed);
+  }
+
+  if (assetQuality !== undefined) {
+    if (!["good", "bad"].includes(assetQuality)) {
+      return res.status(400).json({ error: "Asset quality must be good or bad" });
+    }
+    updated.assetQuality = assetQuality;
+  }
+
+  if (folderId !== undefined) {
+    let resolvedFolderId = null;
+    if (folderId !== null && folderId !== "") {
+      if (!findFolder(folderId)) {
+        return res.status(400).json({ error: "Folder not found" });
+      }
+      resolvedFolderId = folderId;
+    }
+    updated.folderId = resolvedFolderId;
+  }
+
+  entries[index] = updated;
   writeMetadata(entries);
-  res.json(entries[index]);
+  res.json({ ...updated, categories: readCategories() });
+});
+
+app.delete("/api/images/:id", (req, res) => {
+  const imageId = req.params.id;
+  const entries = readMetadata();
+  const index = entries.findIndex((e) => e.id === imageId);
+  if (index === -1) {
+    return res.status(404).json({ error: "Image not found" });
+  }
+
+  const [removed] = entries.splice(index, 1);
+  const filePath = path.join(UPLOADS_DIR, removed.filename);
+  if (fs.existsSync(filePath)) {
+    fs.unlinkSync(filePath);
+  }
+  writeMetadata(entries);
+  res.json({ ok: true });
+});
+
+app.patch("/api/folders/:id", (req, res) => {
+  const folderId = req.params.id;
+  const name = req.body?.name?.trim();
+  if (!name) {
+    return res.status(400).json({ error: "Folder name is required" });
+  }
+
+  const folders = readFolders();
+  const index = folders.findIndex((f) => f.id === folderId);
+  if (index === -1) {
+    return res.status(404).json({ error: "Folder not found" });
+  }
+  if (
+    folders.some(
+      (f, i) => i !== index && f.name.toLowerCase() === name.toLowerCase()
+    )
+  ) {
+    return res.status(400).json({ error: "A folder with this name already exists" });
+  }
+
+  folders[index] = { ...folders[index], name };
+  writeFolders(folders);
+  res.json(folders[index]);
+});
+
+app.delete("/api/folders/:id", (req, res) => {
+  const folderId = req.params.id;
+  const folders = readFolders();
+  const index = folders.findIndex((f) => f.id === folderId);
+  if (index === -1) {
+    return res.status(404).json({ error: "Folder not found" });
+  }
+
+  const entries = readMetadata();
+  for (const entry of entries) {
+    if (entry.folderId === folderId) {
+      entry.folderId = null;
+    }
+  }
+  writeMetadata(entries);
+
+  folders.splice(index, 1);
+  writeFolders(folders);
+  res.json({ ok: true });
 });
 
 app.post("/api/upload", (req, res) => {

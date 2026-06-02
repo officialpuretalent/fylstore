@@ -33,6 +33,17 @@ const filesLabel = document.getElementById("files-label");
 const folderDialog = document.getElementById("folder-dialog");
 const folderForm = document.getElementById("folder-form");
 const folderNameInput = document.getElementById("folder-name");
+const folderDialogTitle = document.getElementById("folder-dialog-title");
+const folderSubmitBtn = document.getElementById("folder-submit-btn");
+const editDialog = document.getElementById("edit-dialog");
+const editForm = document.getElementById("edit-form");
+const editNameInput = document.getElementById("edit-name");
+const editCategorySelect = document.getElementById("edit-category");
+const editFolderSelect = document.getElementById("edit-folder");
+
+let folderDialogMode = "create";
+let editingFolderId = null;
+let editingImageId = null;
 
 function publicUrl(path) {
   return `${window.location.origin}${path}`;
@@ -192,10 +203,26 @@ function renderBreadcrumb() {
   breadcrumb.appendChild(sep);
 
   const folder = allFolders.find((f) => f.id === currentFolderId);
+  if (!folder) return;
+
   const current = document.createElement("span");
   current.className = "breadcrumb-btn current";
-  current.textContent = folder?.name || "Folder";
+  current.textContent = folder.name;
   breadcrumb.appendChild(current);
+
+  const renameBtn = document.createElement("button");
+  renameBtn.type = "button";
+  renameBtn.className = "btn-secondary btn-sm breadcrumb-action";
+  renameBtn.textContent = "Rename";
+  renameBtn.addEventListener("click", () => openEditFolder(folder));
+  breadcrumb.appendChild(renameBtn);
+
+  const deleteBtn = document.createElement("button");
+  deleteBtn.type = "button";
+  deleteBtn.className = "btn-danger btn-sm breadcrumb-action";
+  deleteBtn.textContent = "Delete";
+  deleteBtn.addEventListener("click", () => deleteFolder(folder));
+  breadcrumb.appendChild(deleteBtn);
 }
 
 function folderIconSvg() {
@@ -272,6 +299,9 @@ function renderFolders() {
   if (!showFolders) return;
 
   for (const folder of allFolders) {
+    const wrap = document.createElement("div");
+    wrap.className = "folder-card-wrap";
+
     const card = document.createElement("button");
     card.type = "button";
     card.className = "folder-card";
@@ -289,7 +319,134 @@ function renderFolders() {
     card.dataset.dropFolder = folder.id;
     card.append(name, count);
     card.addEventListener("click", () => setCurrentFolder(folder.id));
-    foldersRow.appendChild(card);
+
+    const actions = document.createElement("div");
+    actions.className = "folder-actions";
+
+    const renameBtn = document.createElement("button");
+    renameBtn.type = "button";
+    renameBtn.className = "icon-btn-sm";
+    renameBtn.title = "Rename folder";
+    renameBtn.innerHTML =
+      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M4 20h4l10-10-4-4L4 16v4zM14 6l4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    renameBtn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      openEditFolder(folder);
+    });
+
+    const deleteBtn = document.createElement("button");
+    deleteBtn.type = "button";
+    deleteBtn.className = "icon-btn-sm danger";
+    deleteBtn.title = "Delete folder";
+    deleteBtn.innerHTML =
+      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M6 7h12M10 11v6M14 11v6M9 7V5h6v2M8 7l1 12h6l1-12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    deleteBtn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      deleteFolder(folder);
+    });
+
+    actions.append(renameBtn, deleteBtn);
+    wrap.append(card, actions);
+    foldersRow.appendChild(wrap);
+  }
+}
+
+function openCreateFolder() {
+  folderDialogMode = "create";
+  editingFolderId = null;
+  folderDialogTitle.textContent = "New folder";
+  folderSubmitBtn.textContent = "Create folder";
+  folderNameInput.value = "";
+  folderDialog.showModal();
+}
+
+function openEditFolder(folder) {
+  folderDialogMode = "edit";
+  editingFolderId = folder.id;
+  folderDialogTitle.textContent = "Rename folder";
+  folderSubmitBtn.textContent = "Save";
+  folderNameInput.value = folder.name;
+  folderDialog.showModal();
+}
+
+async function deleteFolder(folder) {
+  const n = countInFolder(folder.id);
+  const extra =
+    n > 0 ? ` ${n} file${n === 1 ? "" : "s"} will move to All files.` : "";
+  if (!confirm(`Delete folder "${folder.name}"?${extra}`)) return;
+
+  try {
+    const res = await fetch(`/api/folders/${encodeURIComponent(folder.id)}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      toast(body.error || "Could not delete folder", "error");
+      return;
+    }
+    if (currentFolderId === folder.id) setCurrentFolder(null);
+    toast("Folder deleted", "success");
+    await loadGallery();
+  } catch {
+    toast("Network error — try again", "error");
+  }
+}
+
+function fillEditFormSelects(entry) {
+  editCategorySelect.innerHTML = "";
+  for (const cat of allCategories) {
+    const opt = document.createElement("option");
+    opt.value = cat;
+    opt.textContent = cat;
+    editCategorySelect.appendChild(opt);
+  }
+  if (entry.category && !allCategories.includes(entry.category)) {
+    const opt = document.createElement("option");
+    opt.value = entry.category;
+    opt.textContent = entry.category;
+    editCategorySelect.appendChild(opt);
+  }
+  editCategorySelect.value = entry.category;
+
+  editFolderSelect.innerHTML = '<option value="">All files (no folder)</option>';
+  for (const folder of allFolders) {
+    const opt = document.createElement("option");
+    opt.value = folder.id;
+    opt.textContent = folder.name;
+    editFolderSelect.appendChild(opt);
+  }
+  editFolderSelect.value = entry.folderId || "";
+}
+
+function openEditImage(entry) {
+  editingImageId = entry.id;
+  editNameInput.value = entry.name;
+  fillEditFormSelects(entry);
+  const quality = entry.assetQuality === "bad" ? "bad" : "good";
+  editForm.querySelector(`input[name="editAssetQuality"][value="${quality}"]`).checked = true;
+  previewDialog.close();
+  editDialog.showModal();
+}
+
+async function deleteImage(entry) {
+  if (!confirm(`Delete "${entry.name}"? The file will be removed permanently.`)) {
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/images/${encodeURIComponent(entry.id)}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      toast(body.error || "Could not delete image", "error");
+      return;
+    }
+    previewDialog.close();
+    toast("Image deleted", "success");
+    await loadGallery();
+  } catch {
+    toast("Network error — try again", "error");
   }
 }
 
@@ -552,6 +709,12 @@ document.getElementById("close-preview").addEventListener("click", () => preview
 document.getElementById("preview-copy").addEventListener("click", () => {
   if (previewEntry) copyText(publicUrl(previewEntry.url));
 });
+document.getElementById("preview-edit").addEventListener("click", () => {
+  if (previewEntry) openEditImage(previewEntry);
+});
+document.getElementById("preview-delete").addEventListener("click", () => {
+  if (previewEntry) deleteImage(previewEntry);
+});
 
 dropZone.addEventListener("click", (e) => {
   if (e.target.closest("#change-file")) return;
@@ -660,10 +823,7 @@ form.addEventListener("submit", async (e) => {
   }
 });
 
-document.getElementById("open-folder-dialog").addEventListener("click", () => {
-  folderNameInput.value = "";
-  folderDialog.showModal();
-});
+document.getElementById("open-folder-dialog").addEventListener("click", openCreateFolder);
 
 document.getElementById("close-folder").addEventListener("click", () => folderDialog.close());
 document.getElementById("cancel-folder").addEventListener("click", () => folderDialog.close());
@@ -677,20 +837,71 @@ folderForm.addEventListener("submit", async (e) => {
   if (!name) return;
 
   try {
-    const res = await fetch("/api/folders", {
-      method: "POST",
+    const isEdit = folderDialogMode === "edit";
+    const res = await fetch(
+      isEdit
+        ? `/api/folders/${encodeURIComponent(editingFolderId)}`
+        : "/api/folders",
+      {
+        method: isEdit ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      }
+    );
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast(body.error || "Could not save folder", "error");
+      return;
+    }
+    if (isEdit) {
+      const idx = allFolders.findIndex((f) => f.id === editingFolderId);
+      if (idx !== -1) allFolders[idx] = body;
+    } else {
+      allFolders.push(body);
+    }
+    allFolders.sort((a, b) => a.name.localeCompare(b.name));
+    folderDialog.close();
+    toast(isEdit ? "Folder renamed" : "Folder created", "success");
+    renderGallery();
+  } catch {
+    toast("Network error — try again", "error");
+  }
+});
+
+document.getElementById("close-edit").addEventListener("click", () => editDialog.close());
+document.getElementById("cancel-edit").addEventListener("click", () => editDialog.close());
+editDialog.addEventListener("click", (e) => {
+  if (e.target === editDialog) editDialog.close();
+});
+
+editForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!editingImageId) return;
+
+  const payload = {
+    name: editNameInput.value.trim(),
+    category: editCategorySelect.value,
+    assetQuality: editForm.querySelector('input[name="editAssetQuality"]:checked')?.value,
+    folderId: editFolderSelect.value || null,
+  };
+
+  try {
+    const res = await fetch(`/api/images/${encodeURIComponent(editingImageId)}`, {
+      method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name }),
+      body: JSON.stringify(payload),
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
-      toast(body.error || "Could not create folder", "error");
+      toast(body.error || "Could not save changes", "error");
       return;
     }
-    allFolders.push(body);
-    allFolders.sort((a, b) => a.name.localeCompare(b.name));
-    folderDialog.close();
-    toast("Folder created", "success");
+    if (body.categories) allCategories = body.categories;
+    const idx = allEntries.findIndex((i) => i.id === editingImageId);
+    if (idx !== -1) allEntries[idx] = body;
+    updateCategoryOptions();
+    editDialog.close();
+    toast("Changes saved", "success");
     renderGallery();
   } catch {
     toast("Network error — try again", "error");
