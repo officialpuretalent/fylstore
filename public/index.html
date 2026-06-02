@@ -229,6 +229,25 @@
       </form>
     </dialog>
 
+    <dialog id="folder-menu-dialog" class="dialog dialog-menu">
+      <div class="dialog-inner">
+        <header class="dialog-header">
+          <h2 id="folder-menu-title">Folder</h2>
+          <button type="button" class="icon-btn" id="close-folder-menu" aria-label="Close">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+            </svg>
+          </button>
+        </header>
+        <div class="menu-actions">
+          <button type="button" class="menu-action" id="folder-menu-rename">Rename folder</button>
+          <button type="button" class="menu-action menu-action--danger" id="folder-menu-delete">
+            Delete folder
+          </button>
+        </div>
+      </div>
+    </dialog>
+
     <dialog id="folder-dialog" class="dialog">
       <form id="folder-form" class="dialog-inner">
         <header class="dialog-header">

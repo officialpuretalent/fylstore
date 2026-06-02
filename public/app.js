@@ -43,6 +43,10 @@ const editFolderSelect = document.getElementById("edit-folder");
 let folderDialogMode = "create";
 let editingFolderId = null;
 let editingImageId = null;
+let folderMenuTarget = null;
+
+const folderMenuDialog = document.getElementById("folder-menu-dialog");
+const folderMenuTitle = document.getElementById("folder-menu-title");
 
 function publicUrl(path) {
   return `${window.location.origin}${path}`;
@@ -300,10 +304,25 @@ function renderFolders() {
     const wrap = document.createElement("div");
     wrap.className = "folder-card-wrap";
 
-    const card = document.createElement("button");
-    card.type = "button";
+    const card = document.createElement("div");
     card.className = "folder-card";
-    card.appendChild(folderIconSvg());
+    card.dataset.dropFolder = folder.id;
+
+    const moreBtn = document.createElement("button");
+    moreBtn.type = "button";
+    moreBtn.className = "folder-more-btn";
+    moreBtn.setAttribute("aria-label", `Options for ${folder.name}`);
+    moreBtn.innerHTML =
+      '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>';
+    moreBtn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      openFolderMenu(folder);
+    });
+
+    const openBtn = document.createElement("button");
+    openBtn.type = "button";
+    openBtn.className = "folder-card-open";
+    openBtn.appendChild(folderIconSvg());
 
     const name = document.createElement("p");
     name.className = "folder-name";
@@ -314,39 +333,24 @@ function renderFolders() {
     const n = countInFolder(folder.id);
     count.textContent = `${n} file${n === 1 ? "" : "s"}`;
 
-    card.dataset.dropFolder = folder.id;
-    card.append(name, count);
-    card.addEventListener("click", () => setCurrentFolder(folder.id));
+    openBtn.append(name, count);
+    openBtn.addEventListener("click", () => setCurrentFolder(folder.id));
 
-    const actions = document.createElement("div");
-    actions.className = "folder-actions";
-
-    const renameBtn = document.createElement("button");
-    renameBtn.type = "button";
-    renameBtn.className = "icon-btn-sm";
-    renameBtn.title = "Rename folder";
-    renameBtn.innerHTML =
-      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M4 20h4l10-10-4-4L4 16v4zM14 6l4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-    renameBtn.addEventListener("click", (ev) => {
-      ev.stopPropagation();
-      openEditFolder(folder);
-    });
-
-    const deleteBtn = document.createElement("button");
-    deleteBtn.type = "button";
-    deleteBtn.className = "icon-btn-sm danger";
-    deleteBtn.title = "Delete folder";
-    deleteBtn.innerHTML =
-      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M6 7h12M10 11v6M14 11v6M9 7V5h6v2M8 7l1 12h6l1-12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-    deleteBtn.addEventListener("click", (ev) => {
-      ev.stopPropagation();
-      deleteFolder(folder);
-    });
-
-    actions.append(renameBtn, deleteBtn);
-    wrap.append(card, actions);
+    card.append(moreBtn, openBtn);
+    wrap.appendChild(card);
     foldersRow.appendChild(wrap);
   }
+}
+
+function openFolderMenu(folder) {
+  folderMenuTarget = folder;
+  folderMenuTitle.textContent = folder.name;
+  folderMenuDialog.showModal();
+}
+
+function closeFolderMenu() {
+  folderMenuDialog.close();
+  folderMenuTarget = null;
 }
 
 function openCreateFolder() {
@@ -726,6 +730,9 @@ document.getElementById("preview-copy").addEventListener("click", () => {
 document.getElementById("preview-edit").addEventListener("click", () => {
   if (previewEntry) openEditImage(previewEntry);
 });
+document.getElementById("preview-move-out").addEventListener("click", () => {
+  moveOutOfFolder();
+});
 document.getElementById("preview-delete").addEventListener("click", () => {
   if (previewEntry) deleteImage(previewEntry);
 });
@@ -838,6 +845,23 @@ form.addEventListener("submit", async (e) => {
 });
 
 document.getElementById("open-folder-dialog").addEventListener("click", openCreateFolder);
+
+document.getElementById("close-folder-menu").addEventListener("click", closeFolderMenu);
+folderMenuDialog.addEventListener("click", (e) => {
+  if (e.target === folderMenuDialog) closeFolderMenu();
+});
+document.getElementById("folder-menu-rename").addEventListener("click", () => {
+  if (!folderMenuTarget) return;
+  const folder = folderMenuTarget;
+  closeFolderMenu();
+  openEditFolder(folder);
+});
+document.getElementById("folder-menu-delete").addEventListener("click", () => {
+  if (!folderMenuTarget) return;
+  const folder = folderMenuTarget;
+  closeFolderMenu();
+  deleteFolder(folder);
+});
 
 document.getElementById("close-folder").addEventListener("click", () => folderDialog.close());
 document.getElementById("cancel-folder").addEventListener("click", () => folderDialog.close());
