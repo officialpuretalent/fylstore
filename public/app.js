@@ -28,7 +28,6 @@ const toastEl = document.getElementById("toast");
 const breadcrumb = document.getElementById("breadcrumb");
 const foldersSection = document.getElementById("folders-section");
 const foldersRow = document.getElementById("folders-row");
-const rootDrop = document.getElementById("root-drop");
 const filesLabel = document.getElementById("files-label");
 const folderDialog = document.getElementById("folder-dialog");
 const folderForm = document.getElementById("folder-form");
@@ -212,14 +211,14 @@ function renderBreadcrumb() {
 
   const renameBtn = document.createElement("button");
   renameBtn.type = "button";
-  renameBtn.className = "btn-secondary btn-sm breadcrumb-action";
+  renameBtn.className = "breadcrumb-action breadcrumb-action--rename";
   renameBtn.textContent = "Rename";
   renameBtn.addEventListener("click", () => openEditFolder(folder));
   breadcrumb.appendChild(renameBtn);
 
   const deleteBtn = document.createElement("button");
   deleteBtn.type = "button";
-  deleteBtn.className = "btn-danger btn-sm breadcrumb-action";
+  deleteBtn.className = "breadcrumb-action breadcrumb-action--delete";
   deleteBtn.textContent = "Delete";
   deleteBtn.addEventListener("click", () => deleteFolder(folder));
   breadcrumb.appendChild(deleteBtn);
@@ -287,7 +286,6 @@ function initDragDrop() {
       renderGallery();
     }
     draggingImageId = null;
-    rootDrop.hidden = true;
   });
 }
 
@@ -520,13 +518,11 @@ function renderCard(entry) {
     card.classList.add("dragging");
     e.dataTransfer.setData("text/plain", entry.id);
     e.dataTransfer.effectAllowed = "move";
-    rootDrop.hidden = !folderIdOf(entry);
   });
 
   card.addEventListener("dragend", () => {
     card.classList.remove("dragging");
     draggingImageId = null;
-    rootDrop.hidden = true;
     document.querySelectorAll(".drop-target").forEach((el) => {
       el.classList.remove("drop-target");
     });
@@ -908,7 +904,6 @@ editForm.addEventListener("submit", async (e) => {
   }
 });
 
-rootDrop.dataset.dropFolder = "root";
 initDragDrop();
 
 loadGallery();
